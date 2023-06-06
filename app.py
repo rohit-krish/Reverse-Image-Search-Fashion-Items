@@ -4,8 +4,7 @@ from tensorflow import keras
 import pickle
 import numpy as np
 from numpy.linalg import norm
-from sklearn.neighbors import NearestNeighbors
-
+from annoy import AnnoyIndex
 
 def feature_extraction(img_path, model):
     img = image.load_img(img_path, target_size=(224, 224))
@@ -28,13 +27,12 @@ model = keras.Sequential([
     keras.layers.GlobalAveragePooling2D()
 ])
 
-feature_list = pickle.load(open('./embeddings.pkl', 'rb'))
 filenames = pickle.load(open('./filenames.pkl', 'rb'))
 
 LIMIT = 5
 
-neibhbors = NearestNeighbors(n_neighbors=LIMIT, algorithm='brute', metric='euclidean')
-neibhbors.fit(feature_list)
+annoy_index = AnnoyIndex(2048, 'angular')
+annoy_index.load('./embeddings.ann')
 
 st.title('Fashion Recommender System')
 
@@ -45,9 +43,10 @@ if uploaded_file is not None:
         f.write(uploaded_file.getbuffer())
     st.image(Image.open(uploaded_file))
     features = feature_extraction('./uploads/'+uploaded_file.name, model)
-    distances, indices = neibhbors.kneighbors([features])
+
+    indices = annoy_index.get_nns_by_vector(features, LIMIT)
 
     cols = st.columns(LIMIT)
     for idx, col in enumerate(cols):
         with col:
-            st.image(filenames[indices[0][idx]])
+            st.image(filenames[indices[idx]])
